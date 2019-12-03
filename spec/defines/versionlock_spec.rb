@@ -8,27 +8,43 @@ describe 'yum::versionlock' do
 
     context 'and no parameters' do
       it { is_expected.to compile.with_all_deps }
-      it { is_expected.to contain_concat__fragment('versionlock_header').with_content("# File managed by puppet\n") }
-      it 'contains a well-formed Concat::Fragment' do
-        is_expected.to contain_concat__fragment("yum-versionlock-#{title}").with_content("#{title}\n")
+      it { is_expected.to contain_exec('yum-versionlock-clear').with_command('/usr/bin/yum versionlock clear') }
+      it 'contains a well-formed versionlock call' do
+        is_expected.to contain_exec("yum-versionlock-#{title}").with_command("/usr/bin/yum versionlock add #{title}")
       end
-      it { is_expected.to contain_concat('/etc/yum/pluginconf.d/versionlock.list').without_notify }
     end
     context 'clean set to true on module' do
       let :pre_condition do
         'class { "yum::plugin::versionlock": clean => true, }'
       end
 
-      it { is_expected.to contain_concat('/etc/yum/pluginconf.d/versionlock.list').with_notify('Exec[yum_clean_all]') }
+      it { is_expected.to contain_exec('yum-versionlock-clear').with_command('/usr/bin/yum versionlock clear') }
+      it { is_expected.to contain_exec('yum-versionlock-clear').with_notify('Exec[yum_clean_all]') }
+      it { is_expected.to contain_exec('yum_clean_all').with_command('/usr/bin/yum clean all') }
+    end
+    context 'remove locks set to false on module' do
+      let :pre_condition do
+        'class { "yum::plugin::versionlock": clean => true, remove_locks => false }'
+      end
+
+      it { is_expected.not_to contain_exec('yum-versionlock-clear') }
       it { is_expected.to contain_exec('yum_clean_all').with_command('/usr/bin/yum clean all') }
     end
     context 'and ensure set to present' do
       let(:params) { { ensure: 'present' } }
 
       it { is_expected.to compile.with_all_deps }
-      it { is_expected.to contain_concat__fragment('versionlock_header').with_content("# File managed by puppet\n") }
-      it 'contains a well-formed Concat::Fragment' do
-        is_expected.to contain_concat__fragment("yum-versionlock-#{title}").with_content("#{title}\n")
+      it 'contains a well-formed versionlock call' do
+        is_expected.to contain_exec("yum-versionlock-#{title}").with_command("/usr/bin/yum versionlock add #{title}")
+      end
+    end
+
+    context 'and ensure set to exclude' do
+      let(:params) { { ensure: 'exclude' } }
+
+      it { is_expected.to compile.with_all_deps }
+      it 'contains a well-formed versionlock call' do
+        is_expected.to contain_exec("yum-versionlock-#{title}").with_command("/usr/bin/yum versionlock exclude #{title}")
       end
     end
 
@@ -36,47 +52,9 @@ describe 'yum::versionlock' do
       let(:params) { { ensure: 'absent' } }
 
       it { is_expected.to compile.with_all_deps }
-      it { is_expected.to contain_concat__fragment('versionlock_header').with_content("# File managed by puppet\n") }
-      it 'contains a well-formed Concat::Fragment' do
-        is_expected.not_to contain_concat__fragment("yum-versionlock-#{title}")
+      it 'contains a well-formed versionlock call' do
+        is_expected.to contain_exec("yum-versionlock-#{title}").with_command("/usr/bin/yum versionlock delete #{title}")
       end
     end
-  end
-
-  context 'with a trailing wildcard title' do
-    let(:title) { '0:bash-4.1.2-9.el6_2.*' }
-
-    it { is_expected.to compile.with_all_deps }
-    it 'contains a well-formed Concat::Fragment' do
-      is_expected.to contain_concat__fragment("yum-versionlock-#{title}").with_content("#{title}\n")
-    end
-  end
-
-  context 'with a complex wildcard title' do
-    let(:title) { '0:bash-4.*-*.el6' }
-
-    it 'contains a well-formed Concat::Fragment' do
-      is_expected.to contain_concat__fragment("yum-versionlock-#{title}").with_content("#{title}\n")
-    end
-  end
-
-  context 'with a release containing dots' do
-    let(:title) { '1:java-1.7.0-openjdk-1.7.0.121-2.6.8.0.el7_3.x86_64' }
-
-    it 'contains a well-formed Concat::Fragment' do
-      is_expected.to contain_concat__fragment("yum-versionlock-#{title}").with_content("#{title}\n")
-    end
-  end
-
-  context 'with an invalid title' do
-    let(:title) { 'bash-4.1.2' }
-
-    it { is_expected.to raise_error(Puppet::PreformattedError, %r(%\{EPOCH\}:%\{NAME\}-%\{VERSION\}-%\{RELEASE\}\.%\{ARCH\})) }
-  end
-
-  context 'with an invalid wildcard pattern' do
-    let(:title) { '0:bash-4.1.2*' }
-
-    it { is_expected.to raise_error(Puppet::PreformattedError, %r(%\{EPOCH\}:%\{NAME\}-%\{VERSION\}-%\{RELEASE\}\.%\{ARCH\})) }
   end
 end

@@ -2,13 +2,8 @@
 #
 # This definition locks package from updates.
 #
-# NOTE: The resource title must use the format
-#   "%{EPOCH}:%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}".  This can be retrieved via
-#   the command `rpm -q --qf '%{EPOCH}:%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}'.
-#   If "%{EPOCH}" returns as '(none)', it should be set to '0'.  Wildcards may
-#   be used within token slots, but must not cover seperators, e.g.,
-#   '0:b*sh-4.1.2-9.*' covers Bash version 4.1.2, revision 9 on all
-#   architectures.
+# NOTE: The resource title is passed directly to the yum versionlock command so check the man pages of the yum
+#   versionlock plugin to explain which format may be used here.
 #
 # Parameters:
 #   [*ensure*] - specifies if versionlock should be present, absent or exclude
@@ -28,24 +23,18 @@ define yum::versionlock (
 ) {
   contain yum::plugin::versionlock
 
-  unless $name.is_a(Yum::VersionlockString) {
-    fail('Package name must be formated as %{EPOCH}:%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}. See Yum::Versionlock documentation for details.')
-  }
-
-  $line_prefix = $ensure ? {
-    'exclude' => '!',
-    default => '',
-  }
-
   case $ensure {
-    'present', 'exclude', default: {
-      concat::fragment { "yum-versionlock-${name}":
-        content => "${line_prefix}${name}\n",
-        target  => $yum::plugin::versionlock::path,
-      }
+    'present', default: {
+      $cmd = 'add'
     }
-    'absent':{
-      # fragment will be removed
+    'exclude': {
+      $cmd = 'exclude'
     }
+    'absent': {
+      $cmd = 'delete'
+    }
+  }
+  exec { "yum-versionlock-${name}":
+    command => "/usr/bin/yum versionlock ${cmd} ${name}",
   }
 }
